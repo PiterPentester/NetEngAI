@@ -1,0 +1,19 @@
+[Unit]
+Description=MiniCPM LLM
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/orangepi/projects/rk-llama.cpp/
+ExecStart=/home/orangepi/projects/rk-llama.cpp/build/bin/llama-server \
+  --model /home/orangepi/projects/rk-llama.cpp/models/MiniCPM5-1B-Q4_K_M.gguf \
+  --port 8080 \
+  --n-gpu-layers 0 \
+  --threads 8 \
+  --jinja
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

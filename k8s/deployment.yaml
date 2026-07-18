@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: neteng-ai-agent
+  namespace: default
+  labels:
+    app: neteng-ai-agent
+status: {}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: neteng-ai-agent
+  template:
+    metadata:
+      labels:
+        app: neteng-ai-agent
+    spec:
+      containers:
+        - name: agent
+          image: ghcr.io/piterpentester/neteng-ai:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: TELEGRAM_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: neteng-ai-agent-secrets
+                  key: TELEGRAM_TOKEN
+            # Points back to the systemd server instance bound on the host OS bridge loop
+            - name: LLAMA_SERVER_URL
+              value: "http://10.43.0.1:8080/v1"
+            # Resolves via CoreDNS using standard cluster naming rules
+            - name: MCP_ENDPOINT
+              value: "http://openwrt-mcp:8000"
+          resources:
+            limits:
+              memory: 512Mi
+              cpu: "500m"
+            requests:
+              memory: 256Mi
+              cpu: "200m"
