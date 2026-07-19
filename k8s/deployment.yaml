@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: agent
-          image: ghcr.io/piterpentester/neteng-ai:da519450
+          image: ghcr.io/piterpentester/neteng-ai:14f33612
           imagePullPolicy: IfNotPresent
           env:
             - name: TELEGRAM_TOKEN
