@@ -27,11 +27,15 @@ spec:
                   name: neteng-ai-agent-secrets
                   key: TELEGRAM_TOKEN
             # Points back to the systemd server instance bound on the host OS bridge loop
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
             - name: LLAMA_SERVER_URL
-              value: "http://10.43.0.1:8080/v1"
+              value: "http://$(HOST_IP):8080/v1"
             # Resolves via CoreDNS using standard cluster naming rules
-            - name: MCP_ENDPOINT
-              value: "http://openwrt-mcp:8000"
+            - name: MCP_HTTP_URL
+              value: "http://openwrt-mcp:8000/mcp"
           resources:
             limits:
               memory: 512Mi

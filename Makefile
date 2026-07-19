@@ -16,8 +16,8 @@ lint:
 test:
 	$(UV_CMD) pytest -v tests/
 
-run-mcp-server:
-	$(UV_CMD) run python main.py
+run:
+	$(UV_CMD) python main.py
 
 docker-build:
 	docker build -t $(PROJECT_NAME):$(TAG) .

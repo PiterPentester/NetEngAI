@@ -31,7 +31,7 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 DEFAULT_SYSTEM_PROMPT = (
     "You are NetEngAI, an expert network automation and diagnostic assistant running locally. "
     "Your primary target is a Google WiFi (AC1304) router flashed with OpenWrt version 25.12.4.\n\n"
-    
+
     "CRITICAL CONTEXT & ARCHITECTURE RULES:\n"
     "1. The underlying environment uses OpenWrt 25.x, which has officially transitioned from the "
     "legacy 'opkg' tool to the 'apk' (Alpine Package Keeper) package manager. If managing or searching "
@@ -40,7 +40,7 @@ DEFAULT_SYSTEM_PROMPT = (
     "of the AC1304 platform (Qualcomm IPQ4019, dual-band AC1200, concurrent 2.4GHz/5GHz configuration).\n"
     "3. Analyze user networking queries systematically. Evaluate interfaces, routing tables, and "
     "ubus statistics cleanly before reaching conclusions.\n\n"
-    
+
     "TOOL EXECUTION MANDATE:\n"
     "If you need to query or interact with the system via an MCP tool, write a single tool call request "
     "using this EXACT XML syntax structure:\n"
@@ -222,6 +222,37 @@ async def run_diagnostic_agent(user_query: str, status_msg) -> str:
                         result_texts.append(item["text"])
 
                 raw_output = "\n".join(result_texts)
+
+                # Prepare proper tool call object for API alignment
+                api_tool_calls = [{
+                    "id": "mcp-call-id-1",
+                    "type": "function",
+                    "function": {
+                        "name": target_tool,
+                        "arguments": json.dumps(target_args)
+                    }
+                }]
+
+                # Append assistant thoughts AND the formal tool call object
+                messages.append({
+                    "role": "assistant",
+                    "content": raw_content,
+                    "tool_calls": api_tool_calls  # Explicit linkage requirement
+                })
+
+                # Append the actual execution results
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": "mcp-call-id-1",
+                    "name": target_tool,
+                    "content": raw_output
+                })
+
+                # Fallback reinforcement: Small local models thrive when data is also present in plain text
+                messages.append({
+                    "role": "user",
+                    "content": f"[SYSTEM NOTE: The tool '{target_tool}' executed successfully. Output result data below. Synthesize this directly for the user]:\n{raw_output}"
+                })
 
                 # Append contexts so model reviews raw tool performance logs
                 messages.append({

@@ -5,13 +5,11 @@ After=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/home/orangepi/projects/rk-llama.cpp/
-ExecStart=/home/orangepi/projects/rk-llama.cpp/build/bin/llama-server \
-  --model /home/orangepi/projects/rk-llama.cpp/models/MiniCPM5-1B-Q4_K_M.gguf \
+WorkingDirectory=/home/orangepi/rk-llama.cpp/
+ExecStart=/home/orangepi/rk-llama.cpp/build/bin/llama-server \
+  --model /home/orangepi/rk-llama.cpp/models/MiniCPM5-1B-Q4_K_M.gguf \
   --port 8080 \
-  --n-gpu-layers 0 \
-  --threads 8 \
-  --jinja
+  --host 0.0.0.0
 Restart=always
 RestartSec=5
 
