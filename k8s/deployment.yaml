@@ -26,6 +26,11 @@ spec:
                 secretKeyRef:
                   name: neteng-ai-agent-secrets
                   key: TELEGRAM_TOKEN
+            - name: APPROVED_TELEGRAM_IDS
+              valueFrom:
+                secretKeyRef:
+                  name: neteng-ai-agent-secrets
+                  key: APPROVED_TELEGRAM_IDS
             # Points back to the systemd server instance bound on the host OS bridge loop
             - name: HOST_IP
               valueFrom:

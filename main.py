@@ -286,10 +286,28 @@ async def run_diagnostic_agent(user_query: str, status_msg) -> str:
                 return clean_reasoning_tokens(raw_content)
 
 
+# Parse approved users from the environment config near the top of your file
+APPROVED_IDS = {
+    int(uid.strip())
+    for uid in os.getenv("APPROVED_TELEGRAM_IDS", "").split(",")
+    if uid.strip().isdigit()
+}
+
 async def telegram_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Processes inbound Telegram text queries."""
+    """Processes inbound Telegram text queries with authorization gatekeeping."""
     if not update.message or not update.message.text:
         return
+
+    user = update.effective_user
+    # --- SECURITY GATEKEEPER BLOCK ---
+    if user.id not in APPROVED_IDS:
+        logger.warning(f"Unauthorized access attempt by User ID: {user.id} (@{user.username})")
+        await update.message.reply_text(
+            "⛔ *Access Denied.*\nYour Telegram account is not whitelisted to execute diagnostics on this router.",
+            parse_mode="Markdown"
+        )
+        return
+    # ---------------------------------
 
     user_query = update.message.text
     status_msg = await update.message.reply_text("⚡ NetEngAI is planning reasoning steps...")
@@ -309,7 +327,15 @@ async def telegram_message_handler(update: Update, context: ContextTypes.DEFAULT
 
 
 async def start_command_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Answers initial start command."""
+    """Answers initial start command with authorization check."""
+    user = update.effective_user
+
+    # --- SECURITY GATEKEEPER BLOCK ---
+    if user.id not in APPROVED_IDS:
+        await update.message.reply_text("⛔ Access Denied.")
+        return
+    # ---------------------------------
+
     await update.message.reply_text(
         "👋 Welcome! I am NetEngAI, running locally on your hardware.\n"
         "Ask me to verify network paths, test latency, check routers, or tail diagnostic logs."
