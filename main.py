@@ -62,17 +62,37 @@ MODEL_NAME = "minicpm5"
 
 
 def clean_reasoning_tokens(text: str) -> str:
-    """Removes reasoning <think>...</think> blocks and XML tool markup from the final output."""
+    """Removes reasoning blocks, XML tags, and extracts raw text from malformed JSON wrappers."""
     if not text:
         return ""
-    # Strip any content inside <think> blocks
+
+    # 1. Strip reasoning tags
     cleaned = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
-    # Strip open/close hanging think tags if output was clipped
     cleaned = re.sub(r"<\/?think>", "", cleaned).strip()
-    # Clean up leftover XML-like tool calls in the final answer if any
+
+    # 2. Clean up structural XML function tags
     cleaned = re.sub(r"<function.*?>.*?</function>", "", cleaned, flags=re.DOTALL).strip()
     cleaned = re.sub(r"name=\".*?\">", "", cleaned).strip()
-    return cleaned
+
+    # 3. Handle malformed xml{"name":"analysis","value":"... wrappers
+    # This pattern captures everything following the "value":" token up until a trailing } or the end of the string
+    if "value\":" in cleaned:
+        # Match pattern after "value":" capturing everything up to an optional quote and closing bracket
+        extracted = re.search(r'"value"\s*:\s*\"?(.*)', cleaned, flags=re.DOTALL)
+        if extracted:
+            content = extracted.group(1).strip()
+            # Clean up trailing JSON closure brackets/quotes if they exist
+            content = re.sub(r'\"?\}\s*$', '', content).strip()
+            cleaned = content
+
+    # 4. Final sanitization of escaped artifacts
+    cleaned = cleaned.replace("\\n", "\n").replace('\\"', '"')
+
+    # 5. Safety fallback if the cleaning stripped everything down to nothing
+    if not cleaned.strip():
+        return "⚠️ Error: The diagnostic model generated an empty or unparseable analysis structure."
+
+    return cleaned.strip()
 
 
 def parse_minicpm_tool_call(text: str) -> tuple[str | None, dict | None]:
@@ -127,7 +147,7 @@ async def run_diagnostic_agent(user_query: str, status_msg) -> str:
     """Manages the lifecycle of an active HTTP handshake with the OpenWrt MCP server."""
     session_id = f"tg-chat-{status_msg.chat_id}"
 
-    # Use Option 2: Wrap the entire execution block with propagate_attributes.
+    # Wrap the entire execution block with propagate_attributes.
     # All underlying call completions automatically receive the session scope.
     with propagate_attributes(
         session_id=session_id,
@@ -223,48 +243,33 @@ async def run_diagnostic_agent(user_query: str, status_msg) -> str:
 
                 raw_output = "\n".join(result_texts)
 
-                # Prepare proper tool call object for API alignment
-                api_tool_calls = [{
-                    "id": "mcp-call-id-1",
-                    "type": "function",
-                    "function": {
-                        "name": target_tool,
-                        "arguments": json.dumps(target_args)
-                    }
-                }]
-
-                # Append assistant thoughts AND the formal tool call object
-                messages.append({
-                    "role": "assistant",
-                    "content": raw_content,
-                    "tool_calls": api_tool_calls  # Explicit linkage requirement
-                })
-
-                # Append the actual execution results
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": "mcp-call-id-1",
-                    "name": target_tool,
-                    "content": raw_output
-                })
-
-                # Fallback reinforcement: Small local models thrive when data is also present in plain text
-                messages.append({
-                    "role": "user",
-                    "content": f"[SYSTEM NOTE: The tool '{target_tool}' executed successfully. Output result data below. Synthesize this directly for the user]:\n{raw_output}"
-                })
-
-                # Append contexts so model reviews raw tool performance logs
+                # 1. Save what the assistant generated initially (the tool request)
                 messages.append({
                     "role": "assistant",
                     "content": raw_content
                 })
+
+                # 2. Supply the raw tool execution results
                 messages.append({
-                    "role": "tool",
-                    "tool_call_id": "mcp-call-id-1",
-                    "name": target_tool,
-                    "content": raw_output
+                    "role": "user",
+                    "content": (
+                        f"[SYSTEM EXECUTION RESULT]\n"
+                        f"The tool '{target_tool}' was executed successfully by the environment.\n"
+                        f"Output Data:\n{raw_output}\n"
+                    )
                 })
+
+                # 3. Swap the system prompt to strip tool mandates and demand plain text/markdown
+                messages[0] = {
+                    "role": "system",
+                    "content": (
+                        "You are NetEngAI, a network automation assistant. "
+                        "Review the tool execution performance metrics and logs provided in the latest user block. "
+                        "Translate this data into a clear, friendly, and structured report for the operator. "
+                        "CRITICAL: Output standard text and Markdown ONLY. Do NOT wrap your text in JSON keys, "
+                        "do NOT wrap your answer in XML nodes, and do NOT invoke or output functions."
+                    )
+                }
 
                 # Second Inference Pass: Model synthesizes router outputs into a clear summary
                 await status_msg.edit_text("📊 Digesting network outputs...")
@@ -292,7 +297,7 @@ async def telegram_message_handler(update: Update, context: ContextTypes.DEFAULT
     try:
         # Run agent loop
         diagnostic_report = await run_diagnostic_agent(user_query, status_msg)
-        await update.message.reply_text(diagnostic_report)
+        await update.message.reply_text(diagnostic_report, parse_mode="Markdown")
     except Exception as e:
         logger.error(f"Agent execution encountered an error: {e}", exc_info=True)
         await update.message.reply_text(f"❌ Diagnostic abort: {str(e)}")
