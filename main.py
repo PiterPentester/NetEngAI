@@ -13,7 +13,7 @@ from langfuse import propagate_attributes
 
 # Official MCP Python SDK imports
 from mcp import ClientSession
-from mcp.client.streamable_http import streamablehttp_client
+from mcp.client.streamable_http import streamable_http_client
 
 # Logging Setup
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -159,7 +159,7 @@ async def run_diagnostic_agent(user_query: str, status_msg) -> str:
 
             # 1. Establish the Streamable HTTP transport channels
             read_stream, write_stream, get_session_id = await exit_stack.enter_async_context(
-                streamablehttp_client(url=MCP_HTTP_URL)
+                streamable_http_client(url=MCP_HTTP_URL)
             )
 
             # 2. Open the protocol session bound to the streams
