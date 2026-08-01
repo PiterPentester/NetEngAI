@@ -3,10 +3,10 @@ name: Deploy to GitHub Pages
 on:
   # Runs on pushes targeting the default branch and website folder
   push:
-    branches: ["main"]
+    branches: ["main", "master"]
     paths:
       - "website/**"
-      - ".github/workflows/webpage.yml"
+      - ".github/workflows/webpage.yaml"
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
